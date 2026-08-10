@@ -66,15 +66,31 @@ def sync_cudagraph_and_dp_padding(
         # number of tokens so each can assume the others' microbatches are the
         # same size. A rank with too few tokens to fill every microbatch pads
         # into them and does no work there, the same way a dummy run does.
-        # Microbatched steps run eager for now; no CUDA graphs are captured for
-        # them yet, so there is nothing to dispatch to.
         ubatch_num_tokens = int(num_tokens_across_dp.max().item())
-        return BatchExecutionDescriptor(
-            cg_mode=CUDAGraphMode.NONE,
-            num_tokens=ubatch_num_tokens,
-            num_reqs=num_reqs,
-            num_ubatches=ubatch_runner.num_ubatches,
-        ), torch.full_like(num_tokens_across_dp, ubatch_num_tokens)
+        # Try a captured FULL graph for this (num_tokens, num_ubatches) shape
+        # first, same dispatch used below for the non-ubatched path. `dispatch`
+        # falls back to a NONE descriptor on its own when nothing matches (no
+        # graph captured for this token count, or the manager is running
+        # eager-only), so microbatched steps still run whether or not a graph
+        # exists for their shape.
+        if cudagraph_manager is not None:
+            ubatch_desc = cudagraph_manager.dispatch(
+                num_reqs,
+                ubatch_num_tokens,
+                uniform_token_count=None,
+                num_active_loras=num_active_loras,
+                num_ubatches=ubatch_runner.num_ubatches,
+            )
+        else:
+            # cudagraph_manager is only None during the profile run, where
+            # every rank runs eager regardless of wants_ubatch.
+            ubatch_desc = BatchExecutionDescriptor(
+                cg_mode=CUDAGraphMode.NONE,
+                num_tokens=ubatch_num_tokens,
+                num_reqs=num_reqs,
+                num_ubatches=ubatch_runner.num_ubatches,
+            )
+        return ubatch_desc, torch.full_like(num_tokens_across_dp, ubatch_num_tokens)
 
     synced_cg_mode = CUDAGraphMode(int(cg_mode_across_dp.min().item()))
 
