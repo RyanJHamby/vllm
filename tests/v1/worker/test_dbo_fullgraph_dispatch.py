@@ -64,6 +64,7 @@ def test_is_compatible_requires_matching_num_ubatches():
         num_tokens=256,
         uniform_token_count=None,
         num_active_loras=0,
+        max_query_len=None,
         num_ubatches=2,
     )
     assert not _is_compatible(
@@ -72,6 +73,7 @@ def test_is_compatible_requires_matching_num_ubatches():
         num_tokens=256,
         uniform_token_count=None,
         num_active_loras=0,
+        max_query_len=None,
         num_ubatches=1,
     )
     assert not _is_compatible(
@@ -80,6 +82,7 @@ def test_is_compatible_requires_matching_num_ubatches():
         num_tokens=256,
         uniform_token_count=None,
         num_active_loras=0,
+        max_query_len=None,
         num_ubatches=2,
     )
 
